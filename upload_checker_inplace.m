@@ -5,7 +5,6 @@ clear all;close all;
 host= 'localhost';  %Host address
 username = 'root';  %Username for Insight
 password = 'test12'; %Password for Insight
-%Choose a dataset name, will be assigned to your imported dataset under the root user.
 ImageFormat = '.tiff'; %Image format within the source directory
 DataForImport = fuf(['/Users/bramalingam/Desktop/Test_Screen_Data/*' ImageFormat],'detail');%Source Directory
 NumFiles=20; %Number of files for Import
@@ -56,15 +55,9 @@ config.targetClass.set('omero.model.Dataset');
 for importopt=1:2
     %Random dataset generation
     finvec=[];
-    for j1=1:NumFiles
+    for NF=1:NumFiles
         
-        NF=NumFiles(j1);
-        
-        %     Projectname = DataForImport(NF);
-        Projectname='Test_inplace';
         project = createProject(session, Projectname); %Create a project
-        %     NumFiles2= fuf(
-        %     for j2=1:length(NumFiles2)
         
         DatasetName = ['test_images_tiff_' num2str(NF)];
         dataset = createDataset(session, DatasetName, project);
