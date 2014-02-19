@@ -56,7 +56,7 @@ config.targetClass.set('omero.model.Dataset');
 for importopt=1:2
     %Random dataset generation
     finvec=[];
-    for j1=1:length(NumFiles)
+    for j1=1:NumFiles
         
         NF=NumFiles(j1);
         
