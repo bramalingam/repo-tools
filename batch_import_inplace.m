@@ -11,6 +11,7 @@ pathFolder = ['/repositories/test_images_good/'];%#ok<*NBRAK> %Source Directory
 timervar={'Projectno','Imageno','Datasetno','createProject','createStore','reader','handler','Candidates1','Candidates2','CreateDataset','ImportLibrary','addObserver','setMetadataOptions','logFactory','ImportCandidates'};
 folder_depth_bioformats=10;%Folder depth for bioformats to search and calculate the number of datasets
 importopt=1; %Inplace import =1;
+outputFolder = '/home/inplace_user/matlab_results';
 
 %Import Packages
 import loci.formats.in.DefaultMetadataOptions;
@@ -51,7 +52,6 @@ config.username.set(username);
 config.password.set(password);
 config.targetClass.set('omero.model.Dataset');
 
-finvec=[];
 d=dir(pathFolder);
 nameFolds = []; %# returns logical vector
 nameFolds = [nameFolds ; {d.name}];
@@ -64,7 +64,7 @@ client.enableKeepAlive(60);
 
 
 %Looped Import
-wierd_folders=[];spw=[];
+wierd_folders=[];spw=[];ImportStats=[];
 for i=1:length(nameFolds)
 
 Projectname = nameFolds{i};
@@ -80,14 +80,14 @@ tic;candidates = handle(ImportCandidates(folder_depth_bioformats,reader, paths, 
 
 %Wierd Folder Errors
 if ((candidates.getContainers().size)==0)
-wierd_folders=[wierd_folders ; i];
+wierd_folders=[wierd_folders ; nameFolds(i)];
 continue
 end
 
 %     Check point 1 : to check if its a SWP(screen/well/plate format)
 check_spw = candidates.getContainers().get(0).getIsSPW();
 if check_spw.toString.matches('true')
-spw=[spw ; i];
+spw=[spw ; nameFolds(i)];
 continue
 end
 
@@ -143,13 +143,60 @@ timevec=[timevec ; i j datasetno t1 t2 t3 t4 t5 t12 t6 t7 t8 t9 t10 t11];
 
 end
 store.logout();store.closeServices();reader.close();
-finvec=[finvec ; timevec];
-
+ImportStats=[ImportStats ; timevec];
 
 end
+
+time1=clock;
+DatasetName=[date '_' num2str(time1(4)) '_' num2str(time1(5)) '_ImportStats.mat'];
+save([outputFolder '/' DatasetName],'ImportStats','nameFolds','spw','wierd_folders','timervar');
+
+%Check a project named Matlab_Result
+projects = getProjects(session);
+for j=1:numel(projects)
+pjname=char(projects(j).getName.getValue());
+if ~isempty(strmatch(pjname,'Matlab_Result','exact'))
+project=projects(j);
+break
+end
+end
+
+if j==numel(projects)
+project = handle(createProject(session, 'Matlab_Result'));
+end
+
+%Create a dataset and annotate the matlab mat file to the dataset (The
+                                                                   %dataset name is the current time).
+dataset = handle(createDataset(session, DatasetName, project.getId.getValue()));
+dataID = dataset.getId().getValue();
+fileAnnotation = writeFileAnnotation(session, [outputFolder '/' DatasetName]);
+link = linkAnnotation(session, fileAnnotation, 'dataset',dataID);
+
+delete([outputFolder '/' DatasetName]);
+
+%Plot results and attach to the dataset
+pid=unique(ImportStats(:,1));
+for i=1:length(pid)
+idx1=find(ImportStats(:,1)==pid(i));
+plotvec=ImportStats(idx1,:);
+bar(plotvec(:,4:end));xlabel('objects');ylabel('Time(secs)');
+saveas(gca,[outputFolder '/' nameFolds{pid(i)} '.jpeg']) ;
+close;
+
+dataID=javaObject('java.lang.Long',dataset.getId().getValue());
+config.targetId.set(dataID);
+store = handle(config.createStore());
+store.logVersionInfo(config.getIniVersionNumber());
+reader = OMEROWrapper(config);
+handler = handle(ErrorHandler(config));
+library = handle(ImportLibrary(store, reader));
+
+candidates_specific= handle(ImportCandidates(folder_depth_bioformats,reader, outputFolder, handler));
+success = library.importCandidates(config, candidates_specific);
+delete([outputFolder '/' nameFolds{pid(i)} '.jpeg']);
+end
+
+
 %Logout and close session
 store.logout;
 client.closeSession();
-time1=clock;
-save([date '_' num2str(time1(4)) '_' num2str(time1(5)) '.mat'],'finvec','nameFolds','spw','wierd_folders','timervar');
-
