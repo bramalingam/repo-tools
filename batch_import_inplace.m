@@ -2,18 +2,17 @@
 clear all;close all;
 
 %Params
-host= 'localhost';  %Host address
-username = 'test_file_handling';  %Username for Insight
-password = 'test12'; %Password for Insight
+host= 'dogfish.openmicroscopy.org';  %Host address
+username = 'username';  %Username for Insight
+password = 'password'; %Password for Insight
 %Choose a dataset name, will be assigned to your imported dataset under the root user.
 ImageFormat = '.tiff'; %Image format within the source directory
-pathFolder = ['/Users/bramalingam/Downloads/data_repo_good/'];%Source Directory
-timervar={'Projectno','Datasetno','createProject','createStore','reader','handler','Candidates1','Candidates2','CreateDataset','ImportLibrary','addObserver','setMetadataOptions','logFactory','ImportCandidates'};
+pathFolder = ['/repositories/test_images_good/'];%#ok<*NBRAK> %Source Directory
+timervar={'Projectno','Imageno','Datasetno','createProject','createStore','reader','handler','Candidates1','Candidates2','CreateDataset','ImportLibrary','addObserver','setMetadataOptions','logFactory','ImportCandidates'};
 folder_depth_bioformats=10;%Folder depth for bioformats to search and calculate the number of datasets
 importopt=1; %Inplace import =1;
 
 %Import Packages
-java.lang.System.setProperty('java.util.prefs.PreferencesFactory','java.util.prefs.MacOSXPreferencesFactory');
 import loci.formats.in.DefaultMetadataOptions;
 import loci.formats.in.MetadataLevel;
 import loci.common.*;
@@ -28,11 +27,14 @@ import ome.services.blitz.repo.*;
 import ome.formats.importer.transfers.*;
 import ome.formats.importer.transfers.SymlinkFileTransfer;
 import ome.formats.importer.cli.CommandLineImporter;
+import java.util.prefs.*;
+
 
 %Logging (switch on)
-loci.common.DebugTools.enableLogging('INFO');
+loci.common.DebugTools.enableLogging('DEBUG');
 
 %Configuration Object
+% java.lang.System.setProperty('java.util.prefs.PreferencesFactory','java.util.prefs.MacOSXPreferencesFactory');
 config = ImportConfig();
 
 %Set Config params
@@ -51,9 +53,9 @@ config.targetClass.set('omero.model.Dataset');
 
 finvec=[];
 d=dir(pathFolder);
-isub = [d(:).isdir]; %# returns logical vector
-nameFolds = {d(isub).name}';
-nameFolds= setdiff(nameFolds,{'.','..'});
+nameFolds = []; %# returns logical vector
+nameFolds = [nameFolds ; {d.name}];
+nameFolds= setdiff(nameFolds,{'.','..','.DS_Store','._.DS_Store'});
 
 %Load Omero
 client = loadOmero(host);
@@ -63,7 +65,7 @@ client.enableKeepAlive(60);
 
 %Looped Import
 wierd_folders=[];spw=[];
-for i=1
+for i=1:length(nameFolds)
 
 Projectname = nameFolds{i};
 %Metadatastore Object
@@ -82,7 +84,7 @@ wierd_folders=[wierd_folders ; i];
 continue
 end
 
-%Check point 1 : to check if its a SWP(screen/well/plate format)
+%     Check point 1 : to check if its a SWP(screen/well/plate format)
 check_spw = candidates.getContainers().get(0).getIsSPW();
 if check_spw.toString.matches('true')
 spw=[spw ; i];
@@ -110,7 +112,7 @@ if isempty(DatasetName)
 DatasetName = Projectname;
 end
 
-if j>1 & ~isempty(intersect(DatasetName,datasetvec(:,1)))
+if j>1 && ~isempty(intersect(DatasetName,datasetvec(:,1)))
 idx1=strmatch(DatasetName, datasetvec(:,1),'exact');
 dataID= datasetvec{idx1,2};
 else
@@ -134,13 +136,13 @@ tic;reader.setMetadataOptions(DefaultMetadataOptions(MetadataLevel.ALL));t9=toc;
 tic;log = org.apache.commons.logging.LogFactory.getLog('ome.formats.importer.ImportLibrary');t10=toc;
 config.targetId.set(dataID);
 tic;candidates_specific= handle(ImportCandidates(folder_depth_bioformats,reader, char(candidates.getContainers.get(j-1).getFile), handler));t12=toc;
+
 tic;success = library.importCandidates(config, candidates_specific);t11=toc;
 
 timevec=[timevec ; i j datasetno t1 t2 t3 t4 t5 t12 t6 t7 t8 t9 t10 t11];
-reader.close();
 
 end
-store.logout();store.closeServices();
+store.logout();store.closeServices();reader.close();
 finvec=[finvec ; timevec];
 
 
@@ -149,5 +151,5 @@ end
 store.logout;
 client.closeSession();
 time1=clock;
-save([date '_' num2str(time1(4)) '_' num2str(time1(5)) '_finvec_testimagesgood.mat'],'finvec','nameFolds','spw','wierd_folders','timevar');
+save([date '_' num2str(time1(4)) '_' num2str(time1(5)) '.mat'],'finvec','nameFolds','spw','wierd_folders','timervar');
 
