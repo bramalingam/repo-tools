@@ -2,9 +2,9 @@
 clear all;close all;
 
 %Params
-host= 'dogfish.openmicroscopy.org';  %Host address
-username = 'data_repo';  %Username for Insight
-password = 'drafty psalm'; %Password for Insight
+host= 'host';  %Host address
+username = 'username';  %Username for Insight
+password = 'password'; %Password for Insight
 
 pathFolder = ['/ome/data_repo/'];%#ok<*NBRAK> %Source Directory with a slash at the end
 timervar={'Projectno','Imageno','Datasetno','createProject','createStore','reader','handler','Candidates1','Candidates2','CreateDataset','ImportLibrary','addObserver','setMetadataOptions','logFactory','ImportCandidates'};
