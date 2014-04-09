@@ -3,11 +3,10 @@ clear all;close all;
 
 %Params
 host= 'dogfish.openmicroscopy.org';  %Host address
-username = 'username';  %Username for Insight
-password = 'password'; %Password for Insight
-%Choose a dataset name, will be assigned to your imported dataset under the root user.
-ImageFormat = '.tiff'; %Image format within the source directory
-pathFolder = ['/repositories/test_images_good/'];%#ok<*NBRAK> %Source Directory
+username = 'data_repo';  %Username for Insight
+password = 'drafty psalm'; %Password for Insight
+
+pathFolder = ['/ome/data_repo/'];%#ok<*NBRAK> %Source Directory with a slash at the end
 timervar={'Projectno','Imageno','Datasetno','createProject','createStore','reader','handler','Candidates1','Candidates2','CreateDataset','ImportLibrary','addObserver','setMetadataOptions','logFactory','ImportCandidates'};
 folder_depth_bioformats=10;%Folder depth for bioformats to search and calculate the number of datasets
 importopt=1; %Inplace import =1;
@@ -55,6 +54,9 @@ config.targetClass.set('omero.model.Dataset');
 d=dir(pathFolder);
 nameFolds = []; %# returns logical vector
 nameFolds = [nameFolds ; {d.name}];
+idx1=strmatch('.',nameFolds);
+idx1=setdiff(1:length(nameFolds),idx1);
+nameFolds=nameFolds(idx1);
 nameFolds= setdiff(nameFolds,{'.','..','.DS_Store','._.DS_Store'});
 
 %Load Omero
@@ -62,20 +64,21 @@ client = loadOmero(host);
 session = client.createSession(username, password);
 client.enableKeepAlive(60);
 
+%Metadatastore Object
+tic;store = handle(config.createStore());
+store.logVersionInfo(config.getIniVersionNumber());t2=toc;
 
 %Looped Import
 wierd_folders=[];spw=[];ImportStats=[];
 for i=1:length(nameFolds)
 
 Projectname = nameFolds{i};
-%Metadatastore Object
-tic;store = handle(config.createStore());
-store.logVersionInfo(config.getIniVersionNumber());t2=toc;
 tic;reader = OMEROWrapper(config);t3=toc;
-
+reader.setGroupFiles(false)
+tic;handler = handle(ErrorHandler(config));t4=toc;
 %     diary('log_test_images_good.txt')
 paths = [pathFolder Projectname];
-tic;handler = handle(ErrorHandler(config));t4=toc;
+
 tic;candidates = handle(ImportCandidates(folder_depth_bioformats,reader, paths, handler));t5=toc;
 
 %Wierd Folder Errors
@@ -142,10 +145,12 @@ tic;success = library.importCandidates(config, candidates_specific);t11=toc;
 timevec=[timevec ; i j datasetno t1 t2 t3 t4 t5 t12 t6 t7 t8 t9 t10 t11];
 
 end
-store.logout();store.closeServices();reader.close();
+reader.close();
 ImportStats=[ImportStats ; timevec];
 
+
 end
+store.logout();store.closeServices();
 
 time1=clock;
 DatasetName=[date '_' num2str(time1(4)) '_' num2str(time1(5)) '_ImportStats.mat'];
@@ -162,7 +167,7 @@ end
 end
 
 if j==numel(projects)
-project = handle(createProject(session, 'Matlab_Result'));
+project = handle(createProject(session, 'Import_Statistics'));
 end
 
 %Create a dataset and annotate the matlab mat file to the dataset (The
@@ -173,30 +178,44 @@ fileAnnotation = writeFileAnnotation(session, [outputFolder '/' DatasetName]);
 link = linkAnnotation(session, fileAnnotation, 'dataset',dataID);
 
 delete([outputFolder '/' DatasetName]);
+%Logout and close session
+store.logout;
+client.closeSession();
+unloadOmero;
+pause(10);
+
+%Load Omero and upload results
+client = loadOmero(host);
+session = client.createSession(username, password);
+client.enableKeepAlive(60);
+reader = OMEROWrapper(config);
+store = handle(config.createStore());
+store.logVersionInfo(config.getIniVersionNumber());
+handler = handle(ErrorHandler(config));
+library = handle(ImportLibrary(store, reader));
 
 %Plot results and attach to the dataset
 pid=unique(ImportStats(:,1));
 for i=1:length(pid)
+
 idx1=find(ImportStats(:,1)==pid(i));
-plotvec=ImportStats(idx1,:);
-bar(plotvec(:,4:end));xlabel('objects');ylabel('Time(secs)');
+plotvec=ImportStats(idx1,:);totval=(plotvec(:,4:end));totval=sum(totval(:));
+bar(plotvec(:,4:end));xlabel('Individual Objects');ylabel('Time(secs)');title(['Total Time Taken : ' num2str(totval) ' Seconds'])
+
 saveas(gca,[outputFolder '/' nameFolds{pid(i)} '.jpeg']) ;
 close;
 
 dataID=javaObject('java.lang.Long',dataset.getId().getValue());
 config.targetId.set(dataID);
-store = handle(config.createStore());
-store.logVersionInfo(config.getIniVersionNumber());
-reader = OMEROWrapper(config);
-handler = handle(ErrorHandler(config));
-library = handle(ImportLibrary(store, reader));
-
-candidates_specific= handle(ImportCandidates(folder_depth_bioformats,reader, outputFolder, handler));
+candidates_specific= (ImportCandidates(folder_depth_bioformats,reader, [outputFolder '/' nameFolds{pid(i)} '.jpeg'], handler));
 success = library.importCandidates(config, candidates_specific);
 delete([outputFolder '/' nameFolds{pid(i)} '.jpeg']);
 end
-
-
+store.logout();store.closeServices();reader.close();
 %Logout and close session
 store.logout;
 client.closeSession();
+clear all;
+unloadOmero;
+
+
