@@ -2,9 +2,9 @@
 clear all;close all;
 
 %Params
-host= 'dogfish.openmicroscopy.org';  %Host address
-username = 'bramalingam';  %Username for Insight
-password = 'Asdfgf;lkjhj1'; %Password for Insight
+host= 'host';  %Host address
+username = 'username';  %Username for Insight
+password = 'password'; %Password for Insight
 %Choose a dataset name, will be assigned to your imported dataset under the root user.
 ImageFormat = '.tiff'; %Image format within the source directory
 pathFolder = ['/ome/data_repo/test_images_good/'];%#ok<*NBRAK> %Source Directory
